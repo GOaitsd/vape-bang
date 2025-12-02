@@ -1,41 +1,311 @@
-# Compiled Lua sources
-luac.out
+-- Services
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local LocalPlayer = Players.LocalPlayer
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 
-# luarocks build files
-*.src.rock
-*.zip
-*.tar.gz
+-- Configuration
+local ANIMATION_ID = "10714068222" -- قم بتغيير هذا المعرف إذا كنت تستخدم AnimationId مختلف
+local TWEEN_DURATION = 0.15 -- سرعة الحركة والنعومة
 
-# Object files
-*.o
-*.os
-*.ko
-*.obj
-*.elf
+-- State Variables
+local backFollowing = false -- حالة متابعة الخلف
+local frontFollowing = false -- حالة متابعة الأمام
+local targetPlayerBack = nil
+local targetPlayerFront = nil
+local activeAnimation = nil
 
-# Precompiled Headers
-*.gch
-*.pch
+-- === GUI Setup ===
 
-# Libraries
-*.lib
-*.a
-*.la
-*.lo
-*.def
-*.exp
+-- Create the ScreenGui
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Parent = game.CoreGui
+ScreenGui.Name = "ModernGUI"
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
-# Shared objects (inc. Windows DLLs)
-*.dll
-*.so
-*.so.*
-*.dylib
+-- Main Frame (Increased height to accommodate new buttons/fields)
+local MainFrame = Instance.new("Frame")
+MainFrame.Parent = ScreenGui
+MainFrame.Size = UDim2.new(0, 300, 0, 250)
+MainFrame.Position = UDim2.new(0.5, -150, 0.5, -125)
+MainFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+MainFrame.BorderSizePixel = 2
+MainFrame.Draggable = true
+MainFrame.Active = true
+MainFrame.BackgroundTransparency = 0.5
 
-# Executables
-*.exe
-*.out
-*.app
-*.i*86
-*.x86_64
-*.hex
+-- Squircle Shape
+local UICorner = Instance.new("UICorner")
+UICorner.Parent = MainFrame
+UICorner.CornerRadius = UDim.new(0, 20)
 
+-- Title Bar
+local TitleBar = Instance.new("Frame")
+TitleBar.Parent = MainFrame
+TitleBar.Size = UDim2.new(1, 0, 0, 25)
+TitleBar.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+TitleBar.BorderSizePixel = 2
+TitleBar.BackgroundTransparency = 0
+
+-- Title Label
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Parent = TitleBar
+TitleLabel.Size = UDim2.new(1, -50, 1, 0)
+TitleLabel.Position = UDim2.new(0.1, 0, 0, 0)
+TitleLabel.Text = "VAPE v1"
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.TextSize = 25
+TitleLabel.Font = Enum.Font.SourceSansBold
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Center
+
+-- Close Button
+local CloseButton = Instance.new("TextButton")
+CloseButton.Parent = TitleBar
+CloseButton.Size = UDim2.new(0, 25, 1, 0)
+CloseButton.Position = UDim2.new(1, -25, 0, 0)
+CloseButton.Text = "X"
+CloseButton.TextSize = 20
+CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseButton.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+CloseButton.BorderSizePixel = 0
+CloseButton.Font = Enum.Font.Gotham
+CloseButton.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
+
+-- Target Box 1 (Back Follow)
+local BackTargetTextBox = Instance.new("TextBox")
+BackTargetTextBox.Parent = MainFrame
+BackTargetTextBox.Size = UDim2.new(0.8, 0, 0, 30)
+BackTargetTextBox.Position = UDim2.new(0.10, -BackTargetTextBox.Size.X.Offset / 2, 0.2, 0)
+BackTargetTextBox.PlaceholderText = "بانق امامي"
+BackTargetTextBox.Text = ""
+BackTargetTextBox.TextSize = 18
+BackTargetTextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+BackTargetTextBox.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+BackTargetTextBox.BorderSizePixel = 0
+BackTargetTextBox.Font = Enum.Font.SourceSans
+BackTargetTextBox.TextXAlignment = Enum.TextXAlignment.Center
+BackTargetTextBox.Name = "BackTargetTextBox"
+
+-- Toggle Button 1 (Back Follow)
+local BackToggleButton = Instance.new("TextButton")
+BackToggleButton.Parent = MainFrame
+BackToggleButton.Size = UDim2.new(0.4, 0, 0, 30)
+BackToggleButton.Position = UDim2.new(0.30, -BackToggleButton.Size.X.Offset / 2, 0.35, 0) -- Centered
+BackToggleButton.Text = "اغتصـاب"
+BackToggleButton.TextSize = 18
+BackToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+BackToggleButton.BackgroundColor3 = Color3.fromRGB(1)
+BackToggleButton.BorderSizePixel = 0
+BackToggleButton.Font = Enum.Font.SourceSansBold
+local BackToggleCorner = Instance.new("UICorner")
+BackToggleCorner.Parent = BackToggleButton
+BackToggleCorner.CornerRadius = UDim.new(0, 8)
+
+-- Target Box 2 (Front Follow)
+local FrontTargetTextBox = Instance.new("TextBox")
+FrontTargetTextBox.Parent = MainFrame
+FrontTargetTextBox.Size = UDim2.new(0.8, 0, 0, 30)
+FrontTargetTextBox.Position = UDim2.new(0.10, -FrontTargetTextBox.Size.X.Offset / 2, 0.55, 0)
+FrontTargetTextBox.PlaceholderText = "بانق خلفي"
+FrontTargetTextBox.Text = ""
+FrontTargetTextBox.TextSize = 18
+FrontTargetTextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+FrontTargetTextBox.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+FrontTargetTextBox.BorderSizePixel = 0
+FrontTargetTextBox.Font = Enum.Font.SourceSans
+FrontTargetTextBox.TextXAlignment = Enum.TextXAlignment.Center
+FrontTargetTextBox.Name = "FrontTargetTextBox"
+
+-- Toggle Button 2 (Front Follow)
+local FrontToggleButton = Instance.new("TextButton")
+FrontToggleButton.Parent = MainFrame
+FrontToggleButton.Size = UDim2.new(0.4, 0, 0, 30)
+FrontToggleButton.Position = UDim2.new(0.30, -FrontToggleButton.Size.X.Offset / 2, 0.7, 0) -- Centered
+FrontToggleButton.Text = "اغتصـاب"
+FrontToggleButton.TextSize = 18
+FrontToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+FrontToggleButton.BackgroundColor3 = Color3.fromRGB(1)
+FrontToggleButton.BorderSizePixel = 0
+FrontToggleButton.Font = Enum.Font.SourceSansBold
+local FrontToggleCorner = Instance.new("UICorner")
+FrontToggleCorner.Parent = FrontToggleButton
+FrontToggleCorner.CornerRadius = UDim.new(0, 8)
+
+-- === Core Functionality ===
+
+local function findTarget(name)
+    local targetNameLower = name:lower()
+    for _, player in pairs(Players:GetPlayers()) do
+        if player.Name:lower():find(targetNameLower) or player.DisplayName:lower():find(targetNameLower) then
+            return player
+        end
+    end
+    return nil
+end
+
+local function playAnimation()
+    local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        local animation = Instance.new("Animation")
+        animation.AnimationId = "rbxassetid://" .. ANIMATION_ID
+        activeAnimation = humanoid:LoadAnimation(animation)
+        activeAnimation:Play()
+        activeAnimation:AdjustSpeed(10000)
+    end
+end
+
+local function stopAnimation()
+    if activeAnimation then
+        activeAnimation:Stop()
+        activeAnimation:Destroy()
+        activeAnimation = nil
+    end
+end
+
+local function followLoop(target, isFront)
+    local localHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not localHRP then return end
+    
+    -- دوران 180 درجة (لجعل اللاعب ينظر للخلف/يواجه الهدف في وضع الخلف)
+    local rotation180 = CFrame.Angles(0, math.pi, 0) 
+    
+    local currentState = isFront and frontFollowing or backFollowing
+    local button = isFront and FrontToggleButton or BackToggleButton
+    
+    while currentState and target and target.Character and LocalPlayer.Character do
+        local targetCharacter = target.Character
+        local targetHRP = targetCharacter:FindFirstChild("HumanoidRootPart")
+        
+        if targetHRP then
+            local baseCFrame = targetHRP.CFrame
+            
+            local forwardPosition, backwardPosition
+            local finalRotation = CFrame.new(0,0,0) 
+            
+            if isFront then
+                -- وضع الأمام: اللاعب أمام الهدف وينظر للأمام (نفس اتجاه الهدف)
+                forwardPosition = baseCFrame * CFrame.new(0, 0.5, 2)
+                backwardPosition = baseCFrame * CFrame.new(0, 0, 1.5)
+                finalRotation = CFrame.new(0,0,0) -- لا دوران: اللاعب ينظر إلى الأمام (الخلف بالنسبة للهدف)
+            else
+                -- وضع الخلف: اللاعب خلف الهدف وينظر للخلف (باتجاه الهدف)
+                forwardPosition = baseCFrame * CFrame.new(0, 0.5, -0.5)
+                backwardPosition = baseCFrame * CFrame.new(0, 0, -1)
+                finalRotation = rotation180 -- دوران 180: اللاعب ينظر إلى الخلف (باتجاه الهدف)
+            end
+            
+            local forwardCFrame = forwardPosition * finalRotation
+            local backwardCFrame = backwardPosition * finalRotation
+
+            -- Tween movement 1
+            local tweenForward = TweenService:Create(
+                localHRP,
+                TweenInfo.new(TWEEN_DURATION, Enum.EasingStyle.Linear, Enum.EasingDirection.Out),
+                {CFrame = forwardCFrame}
+            )
+            tweenForward:Play()
+            tweenForward.Completed:Wait()
+
+            currentState = isFront and frontFollowing or backFollowing
+            if not currentState then break end
+
+            -- Tween movement 2
+            local tweenBackward = TweenService:Create(
+                localHRP,
+                TweenInfo.new(TWEEN_DURATION, Enum.EasingStyle.Linear, Enum.EasingDirection.Out),
+                {CFrame = backwardCFrame}
+            )
+            tweenBackward:Play()
+            tweenBackward.Completed:Wait()
+
+            currentState = isFront and frontFollowing or backFollowing
+            if not currentState then break end
+            
+            task.wait(0.01)
+
+        else
+            print("Target character became invalid. Stopping follow.")
+            if isFront then frontFollowing = false else backFollowing = false end
+            break
+        end
+        
+        currentState = isFront and frontFollowing or backFollowing
+    end
+    
+    -- When loop ends, reset the button text and stop animation if both are off
+    if not (frontFollowing or backFollowing) then
+        stopAnimation()
+    end
+    
+    button.Text = "بدء (" .. (isFront and "أمام" or "خلف") .. ")"
+end
+
+-- === Event Connections ===
+
+-- BACK Follow Button (Follows behind the target, looking AT the target)
+BackToggleButton.MouseButton1Click:Connect(function()
+    if not backFollowing then
+        local targetName = BackTargetTextBox.Text
+        if not targetName or targetName:len() == 0 then
+             print("الرجاء إدخال اسم الهدف للمتابعة الخلفية.")
+             return
+        end
+        
+        targetPlayerBack = findTarget(targetName)
+        
+        if targetPlayerBack and targetPlayerBack.Character and LocalPlayer.Character then
+            -- Stop other follow mode if active
+            if frontFollowing then 
+                frontFollowing = false 
+                FrontToggleButton.Text = "بدء (أمام)"
+            end
+            
+            backFollowing = true
+            BackToggleButton.Text = "توقف (خلف)"
+            
+            playAnimation()
+            task.spawn(followLoop, targetPlayerBack, false)
+        else
+            print("لا يوجد احد بهذا الاسم في السيرفر أو لم يتم تحميل شخصيته.")
+        end
+    else
+        backFollowing = false
+        BackToggleButton.Text = "بدء (خلف)"
+    end
+end)
+
+-- FRONT Follow Button (Follows in front of the target, looking AWAY from the target/same direction)
+FrontToggleButton.MouseButton1Click:Connect(function()
+    if not frontFollowing then
+        local targetName = FrontTargetTextBox.Text
+        if not targetName or targetName:len() == 0 then
+             print("الرجاء إدخال اسم الهدف للمتابعة الأمامية.")
+             return
+        end
+        
+        targetPlayerFront = findTarget(targetName)
+        
+        if targetPlayerFront and targetPlayerFront.Character and LocalPlayer.Character then
+            -- Stop other follow mode if active
+            if backFollowing then 
+                backFollowing = false 
+                BackToggleButton.Text = "بدء (خلف)"
+            end
+            
+            frontFollowing = true
+            FrontToggleButton.Text = "توقف (أمام)"
+            
+            playAnimation()
+            task.spawn(followLoop, targetPlayerFront, true)
+        else
+            print("لا يوجد احد بهذا الاسم في السيرفر أو لم يتم تحميل شخصيته.")
+        end
+    else
+        frontFollowing = false
+        FrontToggleButton.Text = "بدء (أمام)"
+    end
+end)
